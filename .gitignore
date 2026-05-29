@@ -21,6 +21,8 @@ Thumbs.db
 *.dll
 
 # Prevent accidental commit of local data files
+raw-force/
+raw-focus/
 screentime-log.json
 memories.json
 chats.json

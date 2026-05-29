@@ -10,7 +10,7 @@ let activeWinModule = null;
 
 const getScreentimeLogPath = () => {
   // Use appdata directory for user data (like Electron does)
-  const userDataPath = path.join(os.homedir(), 'AppData', 'Roaming', 'fkinrouund');
+  const userDataPath = path.join(os.homedir(), 'AppData', 'Roaming', 'raw-force');
   if (!fs.existsSync(userDataPath)) {
     fs.mkdirSync(userDataPath, { recursive: true });
   }

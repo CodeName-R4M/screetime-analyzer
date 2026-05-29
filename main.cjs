@@ -15,7 +15,7 @@ let activeWinModule = null;
 const getScreentimeLogPath = () => {
   if (!screentimeLogPath) {
     // Use the same path as standalone tracker for consistency
-    const userDataPath = path.join(require('os').homedir(), 'AppData', 'Roaming', 'fkinrouund');
+    const userDataPath = path.join(require('os').homedir(), 'AppData', 'Roaming', 'raw-force');
     if (!fs.existsSync(userDataPath)) {
       fs.mkdirSync(userDataPath, { recursive: true });
     }
@@ -271,8 +271,16 @@ app.whenReady().then(async () => {
     args: ['--hidden'] // Start hidden on boot
   });
 
-  // Start tracking FIRST, no matter what
-  startTracking();
+  // Check if ActivityWatch is available
+  const awAvailable = await isActivityWatchAvailable();
+
+  // Only start built-in tracker if ActivityWatch is NOT available
+  if (!awAvailable) {
+    console.log(`[${new Date().toLocaleTimeString()}] Starting built-in screentime tracker`);
+    startTracking();
+  } else {
+    console.log(`[${new Date().toLocaleTimeString()}] ActivityWatch is running - skipping built-in tracker`);
+  }
 
   // Create tray
   createTray();
@@ -295,10 +303,14 @@ app.whenReady().then(async () => {
   });
 });
 
-app.on('before-quit', () => {
-  endCurrentSession();
-  if (trackingInterval) {
-    clearInterval(trackingInterval);
+app.on('before-quit', async () => {
+  // Only end session if we were running the built-in tracker
+  const awAvailable = await isActivityWatchAvailable();
+  if (!awAvailable) {
+    endCurrentSession();
+    if (trackingInterval) {
+      clearInterval(trackingInterval);
+    }
   }
 });
 
@@ -539,9 +551,8 @@ ipcMain.handle('fetch-screentime', async (event) => {
   if (awAvailable) {
     console.log(`[${new Date().toLocaleTimeString()}] Screentime: Using ActivityWatch`);
     try {
-      // First, do two-way sync
+      // Always sync ActivityWatch data to our local log first
       await syncActivityWatchToBuiltin();
-      await syncBuiltinToActivityWatch();
 
       // Get buckets ONCE
       const buckets = await fetchActivityWatchDirect('buckets');
