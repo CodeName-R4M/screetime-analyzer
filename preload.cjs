@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   fetchScreentime: () => ipcRenderer.invoke('fetch-screentime'),
   checkOllama: () => ipcRenderer.invoke('check-ollama'),
+  getAIProvider: () => ipcRenderer.invoke('get-ai-provider'),
   saveMemory: (entry) => ipcRenderer.invoke('save-memory', entry),
   loadMemories: () => ipcRenderer.invoke('load-memories'),
   deleteMemory: (id) => ipcRenderer.invoke('delete-memory', id),

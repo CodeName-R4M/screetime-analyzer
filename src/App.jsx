@@ -29,7 +29,6 @@ const extractMemoriesFromText = (text) => {
     return 'note';
   };
 
-  // Rule 1: "remember (that) [something]" or "note: [something]" or "remind me (to/that) [something]"
   const rememberRegex = /\b(?:remember\s+that|remember|remind\s+me\s+to|remind\s+me\s+that|note\s*:\s*)\s+([^.!?\n]+)/i;
   const rememberMatch = text.match(rememberRegex);
   if (rememberMatch) {
@@ -39,7 +38,6 @@ const extractMemoriesFromText = (text) => {
     }
   }
 
-  // Rule 2: "my name is [Name]"
   const nameRegex = /\bmy\s+name\s+is\s+([^.!?,\n]+)/i;
   const nameMatch = text.match(nameRegex);
   if (nameMatch) {
@@ -49,7 +47,6 @@ const extractMemoriesFromText = (text) => {
     }
   }
 
-  // Rule 3: "i study at [College]" or "i go to [College]" or "college: [College]"
   const collegeRegex = /\bi\s+(?:study\s+at|go\s+to|attend)\s+([^.!?,\n]+)/i;
   const collegeMatch = text.match(collegeRegex);
   if (collegeMatch) {
@@ -59,7 +56,6 @@ const extractMemoriesFromText = (text) => {
     }
   }
 
-  // Rule 4: "i am in [X] semester" or "i'm in [X] semester"
   const semRegex = /\bi(?:\s+am|'m)\s+in\s+(?:my\s+)?([^.!?,\n]*semester)/i;
   const semMatch = text.match(semRegex);
   if (semMatch) {
@@ -67,7 +63,6 @@ const extractMemoriesFromText = (text) => {
     extracted.push({ content: `I am in ${val}`, category: 'class' });
   }
 
-  // Rule 5: "exam on [X]" or "i have an exam on [X]" or "midterm on [X]"
   const examRegex = /\b(?:i\s+have\s+an?\s+)?(?:exam|midterm|final\s*exam|test)\s+(?:on|for|in)\s+([^.!?,\n]+)/i;
   const examMatch = text.match(examRegex);
   if (examMatch) {
@@ -77,7 +72,6 @@ const extractMemoriesFromText = (text) => {
     }
   }
 
-  // Rule 6: "class at [X]" or "class on [X]"
   const classRegex = /\b(?:i\s+have\s+)?class\s+(?:at|on|for)\s+([^.!?,\n]+)/i;
   const classMatch = text.match(classRegex);
   if (classMatch) {
@@ -87,7 +81,6 @@ const extractMemoriesFromText = (text) => {
     }
   }
 
-  // Rule 7: relationship status
   const relRegex = /\bi(?:\s+am|'m)\s+(single|dating|married|engaged)\b/i;
   const relMatch = text.match(relRegex);
   if (relMatch) {
@@ -97,35 +90,89 @@ const extractMemoriesFromText = (text) => {
   return extracted;
 };
 
+// Mock data for browser preview (when window.electronAPI is not available)
+const MOCK_DATA = {
+  screentime: [
+    { name: 'VS Code', duration: 180 },
+    { name: 'Chrome', duration: 90 },
+    { name: 'Discord', duration: 45 },
+    { name: 'Spotify', duration: 30 },
+  ],
+  monthlyActivity: Array.from({ length: 30 }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    return {
+      date: date.toISOString().split('T')[0],
+      apps: {
+        'VS Code': Math.floor(Math.random() * 240) + 60,
+        'Chrome': Math.floor(Math.random() * 180) + 30,
+      }
+    };
+  }).reverse(),
+  screentimeSource: 'Built-in Tracker',
+  memories: [
+    { id: 1, content: 'Exam on May 30th', category: 'exam', savedAt: new Date().toISOString() },
+    { id: 2, content: 'My name is Ashborn', category: 'personal', savedAt: new Date().toISOString() },
+    { id: 3, content: 'Class at 10 AM tomorrow', category: 'class', savedAt: new Date().toISOString() },
+  ],
+  chats: {
+    '1': {
+      title: 'Welcome Chat',
+      date: new Date().toISOString().split('T')[0],
+      messages: [
+        { role: 'assistant', content: "Uncensored Assistant ready. How can I help?" },
+        { role: 'user', content: "What's my screentime today?" },
+        { role: 'assistant', content: "You've been using VS Code for ~3 hours, Chrome for ~1.5 hours, Discord for ~45 mins, and Spotify for ~30 mins. Your total screentime today is about 5.75 hours." },
+      ]
+    },
+    '2': {
+      title: 'New Chat',
+      date: new Date().toISOString().split('T')[0],
+      messages: [
+        { role: 'assistant', content: "Uncensored Assistant ready. How can I help?" },
+      ]
+    }
+  }
+};
+
 function App() {
   const [screentime, setScreentime] = useState([]);
-  const [monthlyActivity, setMonthlyActivity] = useState([]); // State for monthly data
+  const [monthlyActivity, setMonthlyActivity] = useState([]);
   const [screentimeSource, setScreentimeSource] = useState('');
   const [memories, setMemories] = useState([]);
   const [newMemory, setNewMemory] = useState({ content: '', category: 'exam' });
   const [extractingMemories, setExtractingMemories] = useState(false);
   
-  // Chat State
-  const [allChats, setAllChats] = useState({}); // { id: { title, messages, date } }
+  const [allChats, setAllChats] = useState({});
   const [currentChatId, setCurrentChatId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [initializing, setInitializing] = useState(true);
   const [ollamaRunning, setOllamaRunning] = useState(false);
+  const [aiProvider, setAIProvider] = useState({ provider: 'ollama', model: '' });
   const hasInitializedRef = useRef(false);
   
   const [loading, setLoading] = useState({ screentime: true, chat: false });
   const [, setError] = useState(null);
   const chatEndRef = useRef(null);
 
+  // Helper to check if we're in browser preview mode
+  const isBrowserPreview = !window.electronAPI;
+
   const fetchData = async () => {
+    if (isBrowserPreview) {
+      setScreentime(MOCK_DATA.screentime);
+      setMonthlyActivity(MOCK_DATA.monthlyActivity);
+      setScreentimeSource(MOCK_DATA.screentimeSource);
+      setLoading(prev => ({ ...prev, screentime: false }));
+      return;
+    }
+    
     setLoading(prev => ({ ...prev, screentime: true }));
     try {
-      // Fetch all screentime data in ONE call
       const data = await window.electronAPI.fetchScreentime();
       setScreentime(data.today);
       setScreentimeSource(data.source);
-      // For UI backward compatibility, create dummy monthly activity if needed
       setMonthlyActivity(data.monthly || []);
       setError(null);
     } catch (err) {
@@ -137,6 +184,7 @@ function App() {
   };
 
   const loadMemories = async () => {
+    if (isBrowserPreview) return MOCK_DATA.memories;
     try {
       const data = await window.electronAPI.loadMemories();
       setMemories(data);
@@ -148,6 +196,7 @@ function App() {
   };
 
   const loadChatHistory = async () => {
+    if (isBrowserPreview) return MOCK_DATA.chats;
     try {
       const history = await window.electronAPI.loadChats();
       setAllChats(history);
@@ -159,6 +208,10 @@ function App() {
   };
 
   const handleDeleteMemory = async (id) => {
+    if (isBrowserPreview) {
+      setMemories(prev => prev.filter(m => m.id !== id));
+      return;
+    }
     try {
       await window.electronAPI.deleteMemory(id);
       setMemories(prev => prev.filter(m => m.id !== id));
@@ -171,6 +224,19 @@ function App() {
   const handleSaveMemory = async (e) => {
     e.preventDefault();
     if (!newMemory.content.trim()) return;
+    
+    if (isBrowserPreview) {
+      const newEntry = { 
+        content: newMemory.content, 
+        category: newMemory.category, 
+        id: Date.now(), 
+        savedAt: new Date().toISOString() 
+      };
+      setMemories(prev => [...prev, newEntry]);
+      setNewMemory({ content: '', category: 'exam' });
+      return;
+    }
+    
     try {
       await window.electronAPI.saveMemory(newMemory);
       const updated = await window.electronAPI.loadMemories();
@@ -183,6 +249,7 @@ function App() {
   };
 
   const handleInstantMemoryExtraction = async (text) => {
+    if (isBrowserPreview) return;
     try {
       const extracted = extractMemoriesFromText(text);
       if (extracted && extracted.length > 0) {
@@ -207,7 +274,6 @@ function App() {
     e.preventDefault();
     if (!input.trim() || loading.chat || !currentChatId || initializing) return;
     
-    // Guard: Make sure current chat exists
     if (!allChats[currentChatId]) {
       console.error('Current chat not found!');
       return;
@@ -218,12 +284,10 @@ function App() {
     setMessages(updatedMessages);
     setInput('');
 
-    // Extract memories instantly
     handleInstantMemoryExtraction(userMessage.content);
 
     setLoading(prev => ({ ...prev, chat: true }));
 
-    // Save user message immediately
     const updatedChat = { 
       ...allChats[currentChatId], 
       messages: updatedMessages,
@@ -231,10 +295,23 @@ function App() {
     };
     const newAllChats = { ...allChats, [currentChatId]: updatedChat };
     setAllChats(newAllChats);
+    
+    if (isBrowserPreview) {
+      // Mock AI response for browser preview
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const assistantMessage = { role: 'assistant', content: "This is a browser preview! For full functionality, run the app using `npm start` in Electron." };
+      const finalMessages = [...updatedMessages, assistantMessage];
+      setMessages(finalMessages);
+      const finalChat = { ...updatedChat, messages: finalMessages };
+      const finalAllChats = { ...newAllChats, [currentChatId]: finalChat };
+      setAllChats(finalAllChats);
+      setLoading(prev => ({ ...prev, chat: false }));
+      return;
+    }
+    
     await window.electronAPI.saveChats(newAllChats);
 
     try {
-      // Get fresh screentime data for chat
       const freshData = await window.electronAPI.fetchScreentime();
       setScreentime(freshData.today);
       const response = await window.electronAPI.chatWithAI(updatedMessages, freshData, memories);
@@ -256,6 +333,13 @@ function App() {
 
   const extractAndSaveMemories = async () => {
     if (!messages || messages.length < 2) return;
+    if (isBrowserPreview) {
+      setExtractingMemories(true);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setExtractingMemories(false);
+      alert('Memory extraction is a preview! For full functionality, run in Electron.');
+      return;
+    }
     setExtractingMemories(true);
     try {
       const extracted = await window.electronAPI.extractMemories(messages);
@@ -290,7 +374,10 @@ function App() {
     setAllChats(updatedChats);
     setCurrentChatId(id);
     setMessages(newChat.messages);
-    window.electronAPI.saveChats(updatedChats);
+    
+    if (!isBrowserPreview) {
+      window.electronAPI.saveChats(updatedChats);
+    }
   };
 
   const switchChat = (id) => {
@@ -299,6 +386,10 @@ function App() {
   };
 
   const checkOllamaStatus = async () => {
+    if (isBrowserPreview) {
+      setOllamaRunning(true);
+      return;
+    }
     try {
       const status = await window.electronAPI.checkOllama();
       setOllamaRunning(status);
@@ -311,12 +402,46 @@ function App() {
     const init = async () => {
       if (hasInitializedRef.current) return;
       hasInitializedRef.current = true;
+
+      if (isBrowserPreview) {
+        // Browser preview mode with mock data
+        setAIProvider({ provider: 'ollama', model: 'mistral:7b-instruct-q4_K_M' });
+        setOllamaRunning(true);
+        const history = await loadChatHistory();
+        await loadMemories();
+        
+        if (Object.keys(history).length === 0) {
+          const id = Date.now().toString();
+          const newChat = {
+            title: 'New Chat',
+            date: new Date().toISOString().split('T')[0],
+            messages: [{ role: 'assistant', content: "Uncensored Assistant ready. How can I help?" }]
+          };
+          const initialChats = { [id]: newChat };
+          setAllChats(initialChats);
+          setCurrentChatId(id);
+          setMessages(newChat.messages);
+        } else {
+          const lastId = Object.keys(history).sort((a, b) => b[0].localeCompare(a[0]))[0];
+          setCurrentChatId(lastId);
+          if (history[lastId]) {
+            setMessages(history[lastId].messages);
+          }
+        }
+        
+        await fetchData();
+        setInitializing(false);
+        return;
+      }
+      
+      // Electron mode with real API
+      const providerInfo = await window.electronAPI.getAIProvider();
+      setAIProvider(providerInfo);
       
       await checkOllamaStatus();
       const history = await loadChatHistory();
       await loadMemories();
       
-      // Initialize chat immediately if no history exists
       if (Object.keys(history).length === 0) {
         const id = Date.now().toString();
         const newChat = {
@@ -330,15 +455,13 @@ function App() {
         setMessages(newChat.messages);
         await window.electronAPI.saveChats(initialChats);
       } else {
-        // If history exists, load the last chat
-        const lastId = Object.keys(history).sort((a, b) => b - a)[0];
+        const lastId = Object.keys(history).sort((a, b) => b[0].localeCompare(a[0]))[0];
         setCurrentChatId(lastId);
         if (history[lastId]) {
           setMessages(history[lastId].messages);
         }
       }
       
-      // Fetch screentime last
       await fetchData();
       setInitializing(false);
     };
@@ -351,9 +474,16 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#fdfcfb] text-slate-900 p-4 lg:p-6 font-sans flex flex-col gap-4">
+      {isBrowserPreview && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-center">
+          <div className="text-amber-800 text-xs font-bold flex items-center justify-center gap-2">
+            <span className="text-amber-500">⚠️</span>
+            Browser Preview Mode — Run <code className="bg-amber-100 px-1 rounded">npm start</code> for full functionality!
+          </div>
+        </div>
+      )}
       <div className="max-w-[1600px] mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-3rem)]">
         
-        {/* Left Column: Stats & Memories */}
         <div className="lg:col-span-3 flex flex-col gap-6 overflow-hidden">
           <header className="flex items-center justify-between">
             <h1 className="text-xl font-black text-indigo-600 flex items-center gap-2">
@@ -388,7 +518,6 @@ function App() {
             </ResponsiveContainer>
           </section>
 
-          {/* Monthly Activity Chart - Only show for ActivityWatch */}
           {screentimeSource === 'ActivityWatch' && (
             <section className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 h-52">
               <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-2">
@@ -449,7 +578,6 @@ function App() {
           </section>
         </div>
 
-        {/* Center: Chat Area */}
         <div className="lg:col-span-6 flex flex-col bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden relative">
           <div className="px-6 py-4 border-b border-slate-50 flex items-center justify-between bg-white/80 backdrop-blur-md z-10">
             <div className="flex items-center gap-3">
@@ -494,6 +622,7 @@ function App() {
                   </div>
                 )}
               </div>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
@@ -547,7 +676,6 @@ function App() {
           </div>
         </div>
 
-        {/* Right Column: History & Navigation */}
         <div className="lg:col-span-3 flex flex-col gap-6 overflow-hidden">
           <button 
             onClick={startNewChat}
