@@ -1,0 +1,40 @@
+{
+  "name": "fkinrouund",
+  "private": true,
+  "version": "0.0.0",
+  "main": "main.cjs",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "electron": "wait-on http://localhost:5173 && electron .",
+    "start": "concurrently -k \"npm run dev\" \"npm run electron\""
+  },
+  "dependencies": {
+    "active-win": "^8.2.1",
+    "lucide-react": "^0.479.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "recharts": "^2.15.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "autoprefixer": "^10.4.17",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^29.1.1",
+    "eslint": "^10.3.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.6.0",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "vite": "^8.0.12",
+    "wait-on": "^7.2.0"
+  }
+}
